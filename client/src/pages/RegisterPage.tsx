@@ -66,7 +66,7 @@ export default function RegisterPage({ onRegister, onNavigateLogin }: RegisterPa
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="Create a password"
             required
             data-testid="input-password"
           />
@@ -79,7 +79,7 @@ export default function RegisterPage({ onRegister, onNavigateLogin }: RegisterPa
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="Re-enter your password"
             required
             data-testid="input-confirm-password"
           />

@@ -56,7 +56,7 @@ export default function LoginPage({ onLogin, onNavigateRegister }: LoginPageProp
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="Enter your password"
             required
             data-testid="input-password"
           />
