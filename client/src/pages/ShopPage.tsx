@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
 import FilterPanel from "@/components/FilterPanel";
@@ -8,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { Sweet } from "@shared/schema";
 
-// TODO: Remove mock data
 import chocolateImage from '@assets/generated_images/Chocolate_truffles_product_photo_82108eff.png';
 import gummiesImage from '@assets/generated_images/Gummy_bears_product_photo_97cd724e.png';
 import lollipopsImage from '@assets/generated_images/Lollipops_product_photo_03dfa45d.png';
@@ -23,25 +25,62 @@ interface ShopPageProps {
   onNavigateAdmin: () => void;
 }
 
-// TODO: Remove mock data
-const mockSweets = [
-  { id: '1', name: 'Chocolate Truffles', category: 'Chocolate', price: 12.99, quantity: 45, image: chocolateImage },
-  { id: '2', name: 'Gummy Bears', category: 'Gummies', price: 5.99, quantity: 120, image: gummiesImage },
-  { id: '3', name: 'Rainbow Lollipops', category: 'Lollipops', price: 3.99, quantity: 8, image: lollipopsImage },
-  { id: '4', name: 'Caramel Delights', category: 'Caramels', price: 8.99, quantity: 0, image: caramelsImage },
-  { id: '5', name: 'Fruit Hard Candies', category: 'Hard Candy', price: 6.49, quantity: 85, image: hardCandyImage },
-  { id: '6', name: 'Chocolate Almonds', category: 'Chocolate', price: 15.99, quantity: 32, image: chocolateAlmondsImage },
-];
+const imageMap: Record<string, string> = {
+  'Chocolate Truffles': chocolateImage,
+  'Gummy Bears': gummiesImage,
+  'Rainbow Lollipops': lollipopsImage,
+  'Caramel Delights': caramelsImage,
+  'Fruit Hard Candies': hardCandyImage,
+  'Chocolate Almonds': chocolateAlmondsImage,
+  'Chocolate': chocolateImage,
+  'Gummies': gummiesImage,
+  'Lollipops': lollipopsImage,
+  'Caramels': caramelsImage,
+  'Hard Candy': hardCandyImage,
+};
 
-const categories = ['Chocolate', 'Gummies', 'Lollipops', 'Caramels', 'Hard Candy'];
+function getImageForSweet(sweet: Sweet): string {
+  return imageMap[sweet.name] || imageMap[sweet.category] || chocolateImage;
+}
 
 export default function ShopPage({ user, onLogout, onNavigateAdmin }: ShopPageProps) {
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50]);
-  const [selectedSweet, setSelectedSweet] = useState<typeof mockSweets[0] | null>(null);
+  const [selectedSweet, setSelectedSweet] = useState<Sweet | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const { toast } = useToast();
+
+  const { data: sweets = [], isLoading } = useQuery<Sweet[]>({
+    queryKey: ['/api/sweets'],
+  });
+
+  const purchaseMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: number; quantity: number }) => {
+      const response = await apiRequest('POST', `/api/sweets/${id}/purchase`, { quantity });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sweets'] });
+      setShowPurchaseModal(false);
+      toast({
+        title: "Purchase successful!",
+        description: `Your purchase has been completed`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Purchase failed",
+        description: error.message || "Could not complete purchase",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const categories = useMemo(() => {
+    const uniqueCategories = new Set(sweets.map(s => s.category));
+    return Array.from(uniqueCategories);
+  }, [sweets]);
 
   const handleCategoryChange = (category: string, checked: boolean) => {
     if (checked) {
@@ -58,7 +97,7 @@ export default function ShopPage({ user, onLogout, onNavigateAdmin }: ShopPagePr
   };
 
   const handlePurchase = (sweetId: string) => {
-    const sweet = mockSweets.find(s => s.id === sweetId);
+    const sweet = sweets.find(s => s.id.toString() === sweetId);
     if (sweet) {
       setSelectedSweet(sweet);
       setShowPurchaseModal(true);
@@ -66,21 +105,21 @@ export default function ShopPage({ user, onLogout, onNavigateAdmin }: ShopPagePr
   };
 
   const handleConfirmPurchase = (sweetId: string, quantity: number) => {
-    // TODO: Remove mock functionality - replace with actual API call
-    console.log('Purchase confirmed:', { sweetId, quantity });
-    toast({
-      title: "Purchase successful!",
-      description: `You've purchased ${quantity} item(s)`,
-    });
+    purchaseMutation.mutate({ id: parseInt(sweetId), quantity });
   };
 
-  // Filter sweets based on search, categories, and price
-  const filteredSweets = mockSweets.filter(sweet => {
+  const filteredSweets = sweets.filter(sweet => {
     const matchesSearch = sweet.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(sweet.category);
     const matchesPrice = sweet.price >= priceRange[0] && sweet.price <= priceRange[1];
     return matchesSearch && matchesCategory && matchesPrice;
   });
+
+  const sweetsWithImages = filteredSweets.map(sweet => ({
+    ...sweet,
+    id: sweet.id.toString(),
+    image: getImageForSweet(sweet),
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -139,14 +178,18 @@ export default function ShopPage({ user, onLogout, onNavigateAdmin }: ShopPagePr
           </aside>
 
           <main className="flex-1">
-            {filteredSweets.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-16">
+                <p className="text-xl text-muted-foreground">Loading sweets...</p>
+              </div>
+            ) : sweetsWithImages.length === 0 ? (
               <div className="text-center py-16">
                 <p className="text-xl text-muted-foreground mb-2">No sweets found</p>
                 <p className="text-sm text-muted-foreground">Try adjusting your filters or search</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredSweets.map(sweet => (
+                {sweetsWithImages.map(sweet => (
                   <SweetCard
                     key={sweet.id}
                     {...sweet}
@@ -162,7 +205,7 @@ export default function ShopPage({ user, onLogout, onNavigateAdmin }: ShopPagePr
       <PurchaseModal
         open={showPurchaseModal}
         onClose={() => setShowPurchaseModal(false)}
-        sweet={selectedSweet}
+        sweet={selectedSweet ? { ...selectedSweet, id: selectedSweet.id.toString(), image: getImageForSweet(selectedSweet) } : null}
         onConfirm={handleConfirmPurchase}
       />
     </div>

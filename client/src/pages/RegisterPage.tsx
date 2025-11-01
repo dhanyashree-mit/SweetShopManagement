@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/lib/auth";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,18 +8,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 
 interface RegisterPageProps {
-  onRegister: (username: string, isAdmin: boolean) => void;
   onNavigateLogin: () => void;
 }
 
-export default function RegisterPage({ onRegister, onNavigateLogin }: RegisterPageProps) {
+export default function RegisterPage({ onNavigateLogin }: RegisterPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { register } = useAuth();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (password !== confirmPassword) {
@@ -30,13 +32,21 @@ export default function RegisterPage({ onRegister, onNavigateLogin }: RegisterPa
       return;
     }
 
-    // TODO: Remove mock functionality - replace with actual API call
-    if (username && password) {
-      onRegister(username, isAdmin);
+    setIsLoading(true);
+    try {
+      await register(username, password, isAdmin);
       toast({
         title: "Registration successful",
         description: "Your account has been created!",
       });
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "Could not create account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -100,8 +110,8 @@ export default function RegisterPage({ onRegister, onNavigateLogin }: RegisterPa
           </label>
         </div>
 
-        <Button type="submit" className="w-full" data-testid="button-register">
-          Create Account
+        <Button type="submit" className="w-full" data-testid="button-register" disabled={isLoading}>
+          {isLoading ? "Creating account..." : "Create Account"}
         </Button>
 
         <p className="text-center text-sm text-muted-foreground">

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header from "@/components/Header";
 import StatCard from "@/components/StatCard";
 import SweetCard from "@/components/SweetCard";
@@ -25,8 +27,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { Sweet } from "@shared/schema";
 
-// TODO: Remove mock data
 import chocolateImage from '@assets/generated_images/Chocolate_truffles_product_photo_82108eff.png';
 import gummiesImage from '@assets/generated_images/Gummy_bears_product_photo_97cd724e.png';
 import lollipopsImage from '@assets/generated_images/Lollipops_product_photo_03dfa45d.png';
@@ -40,31 +42,110 @@ interface AdminPageProps {
   onNavigateShop: () => void;
 }
 
-// TODO: Remove mock data
-const mockSweets = [
-  { id: '1', name: 'Chocolate Truffles', category: 'Chocolate', price: 12.99, quantity: 45, image: chocolateImage },
-  { id: '2', name: 'Gummy Bears', category: 'Gummies', price: 5.99, quantity: 120, image: gummiesImage },
-  { id: '3', name: 'Rainbow Lollipops', category: 'Lollipops', price: 3.99, quantity: 8, image: lollipopsImage },
-  { id: '4', name: 'Caramel Delights', category: 'Caramels', price: 8.99, quantity: 0, image: caramelsImage },
-  { id: '5', name: 'Fruit Hard Candies', category: 'Hard Candy', price: 6.49, quantity: 85, image: hardCandyImage },
-  { id: '6', name: 'Chocolate Almonds', category: 'Chocolate', price: 15.99, quantity: 32, image: chocolateAlmondsImage },
-];
+const imageMap: Record<string, string> = {
+  'Chocolate Truffles': chocolateImage,
+  'Gummy Bears': gummiesImage,
+  'Rainbow Lollipops': lollipopsImage,
+  'Caramel Delights': caramelsImage,
+  'Fruit Hard Candies': hardCandyImage,
+  'Chocolate Almonds': chocolateAlmondsImage,
+  'Chocolate': chocolateImage,
+  'Gummies': gummiesImage,
+  'Lollipops': lollipopsImage,
+  'Caramels': caramelsImage,
+  'Hard Candy': hardCandyImage,
+};
+
+function getImageForSweet(sweet: Sweet): string {
+  return imageMap[sweet.name] || imageMap[sweet.category] || chocolateImage;
+}
 
 const categories = ['Chocolate', 'Gummies', 'Lollipops', 'Caramels', 'Hard Candy'];
 
 export default function AdminPage({ user, onLogout, onNavigateShop }: AdminPageProps) {
-  const [sweets, setSweets] = useState(mockSweets);
   const [search, setSearch] = useState("");
   const [showSweetForm, setShowSweetForm] = useState(false);
-  const [editingSweet, setEditingSweet] = useState<typeof mockSweets[0] | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editingSweet, setEditingSweet] = useState<Sweet | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // TODO: Remove mock calculations
+  const { data: sweets = [], isLoading } = useQuery<Sweet[]>({
+    queryKey: ['/api/sweets'],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; category: string; price: number; quantity: number }) => {
+      const response = await apiRequest('POST', '/api/sweets', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sweets'] });
+      setShowSweetForm(false);
+      toast({
+        title: "Sweet added",
+        description: "New sweet has been added to inventory",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Could not add sweet",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<{ name: string; category: string; price: number; quantity: number }> }) => {
+      const response = await apiRequest('PUT', `/api/sweets/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sweets'] });
+      setShowSweetForm(false);
+      setEditingSweet(null);
+      toast({
+        title: "Sweet updated",
+        description: "Changes have been saved successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Could not update sweet",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest('DELETE', `/api/sweets/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sweets'] });
+      setDeleteConfirm(null);
+      toast({
+        title: "Sweet deleted",
+        description: "The sweet has been removed from inventory",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Could not delete sweet",
+        variant: "destructive",
+      });
+    },
+  });
+
   const totalProducts = sweets.length;
   const lowStockCount = sweets.filter(s => s.quantity > 0 && s.quantity <= 10).length;
   const outOfStockCount = sweets.filter(s => s.quantity === 0).length;
-  const totalRevenue = sweets.reduce((sum, s) => sum + (s.price * 10), 0); // Mock sales
+  const totalRevenue = useMemo(() => 
+    sweets.reduce((sum, s) => sum + (s.price * Math.min(s.quantity, 10)), 0),
+    [sweets]
+  );
 
   const handleAddSweet = () => {
     setEditingSweet(null);
@@ -72,7 +153,7 @@ export default function AdminPage({ user, onLogout, onNavigateShop }: AdminPageP
   };
 
   const handleEditSweet = (id: string) => {
-    const sweet = sweets.find(s => s.id === id);
+    const sweet = sweets.find(s => s.id.toString() === id);
     if (sweet) {
       setEditingSweet(sweet);
       setShowSweetForm(true);
@@ -80,51 +161,32 @@ export default function AdminPage({ user, onLogout, onNavigateShop }: AdminPageP
   };
 
   const handleDeleteSweet = (id: string) => {
-    setDeleteConfirm(id);
+    setDeleteConfirm(parseInt(id));
   };
 
   const confirmDelete = () => {
-    if (deleteConfirm) {
-      // TODO: Remove mock functionality - replace with actual API call
-      setSweets(sweets.filter(s => s.id !== deleteConfirm));
-      toast({
-        title: "Sweet deleted",
-        description: "The sweet has been removed from inventory",
-      });
-      setDeleteConfirm(null);
+    if (deleteConfirm !== null) {
+      deleteMutation.mutate(deleteConfirm);
     }
   };
 
-  const handleSubmitSweet = (data: Omit<typeof mockSweets[0], 'id' | 'image'>) => {
+  const handleSubmitSweet = (data: { name: string; category: string; price: number; quantity: number }) => {
     if (editingSweet) {
-      // TODO: Remove mock functionality - replace with actual API call
-      setSweets(sweets.map(s => 
-        s.id === editingSweet.id 
-          ? { ...s, ...data }
-          : s
-      ));
-      toast({
-        title: "Sweet updated",
-        description: "Changes have been saved successfully",
-      });
+      updateMutation.mutate({ id: editingSweet.id, data });
     } else {
-      // TODO: Remove mock functionality - replace with actual API call
-      const newSweet = {
-        ...data,
-        id: String(sweets.length + 1),
-        image: chocolateImage, // Default image
-      };
-      setSweets([...sweets, newSweet]);
-      toast({
-        title: "Sweet added",
-        description: "New sweet has been added to inventory",
-      });
+      createMutation.mutate(data);
     }
   };
 
   const filteredSweets = sweets.filter(sweet =>
     sweet.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const sweetsWithImages = filteredSweets.map(sweet => ({
+    ...sweet,
+    id: sweet.id.toString(),
+    image: getImageForSweet(sweet),
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -198,14 +260,18 @@ export default function AdminPage({ user, onLogout, onNavigateShop }: AdminPageP
           </Button>
         </div>
 
-        {filteredSweets.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16">
+            <p className="text-xl text-muted-foreground">Loading inventory...</p>
+          </div>
+        ) : sweetsWithImages.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-xl text-muted-foreground mb-2">No products found</p>
-            <p className="text-sm text-muted-foreground">Try adjusting your search</p>
+            <p className="text-sm text-muted-foreground">Try adjusting your search or add your first sweet</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredSweets.map(sweet => (
+            {sweetsWithImages.map(sweet => (
               <SweetCard
                 key={sweet.id}
                 {...sweet}
@@ -221,7 +287,7 @@ export default function AdminPage({ user, onLogout, onNavigateShop }: AdminPageP
       <SweetForm
         open={showSweetForm}
         onClose={() => setShowSweetForm(false)}
-        sweet={editingSweet}
+        sweet={editingSweet ? { ...editingSweet, id: editingSweet.id.toString(), image: getImageForSweet(editingSweet) } : null}
         onSubmit={handleSubmitSweet}
         categories={categories}
       />

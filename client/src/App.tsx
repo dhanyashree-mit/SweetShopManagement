@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
+import { AuthProvider, useAuth } from "./lib/auth";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import LoginPage from "@/pages/LoginPage";
@@ -10,56 +11,71 @@ import AdminPage from "@/pages/AdminPage";
 
 type Page = 'login' | 'register' | 'shop' | 'admin';
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('login');
-  const [user, setUser] = useState<{ username: string; isAdmin: boolean } | null>(null);
-
-  const handleLogin = (username: string, isAdmin: boolean) => {
-    setUser({ username, isAdmin });
-    setCurrentPage('shop');
-  };
-
-  const handleRegister = (username: string, isAdmin: boolean) => {
-    setUser({ username, isAdmin });
-    setCurrentPage('shop');
-  };
+  const { user, logout, isLoading } = useAuth();
 
   const handleLogout = () => {
-    setUser(null);
+    logout();
     setCurrentPage('login');
   };
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-lg">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
         {currentPage === 'login' && (
           <LoginPage 
-            onLogin={handleLogin}
             onNavigateRegister={() => setCurrentPage('register')}
           />
         )}
         {currentPage === 'register' && (
           <RegisterPage 
-            onRegister={handleRegister}
             onNavigateLogin={() => setCurrentPage('login')}
           />
         )}
-        {currentPage === 'shop' && user && (
-          <ShopPage 
-            user={user}
-            onLogout={handleLogout}
-            onNavigateAdmin={() => setCurrentPage('admin')}
-          />
-        )}
-        {currentPage === 'admin' && user && (
-          <AdminPage 
-            user={user}
-            onLogout={handleLogout}
-            onNavigateShop={() => setCurrentPage('shop')}
-          />
-        )}
-        <Toaster />
-      </TooltipProvider>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {currentPage === 'shop' && (
+        <ShopPage 
+          user={user}
+          onLogout={handleLogout}
+          onNavigateAdmin={() => setCurrentPage('admin')}
+        />
+      )}
+      {currentPage === 'admin' && (
+        <AdminPage 
+          user={user}
+          onLogout={handleLogout}
+          onNavigateShop={() => setCurrentPage('shop')}
+        />
+      )}
+    </>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <AppContent />
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
