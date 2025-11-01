@@ -40,7 +40,7 @@ export default function SweetCard({
           className="w-full h-full object-cover"
         />
         <Badge 
-          className="absolute top-4 right-4"
+          className="absolute top-4 right-2"
           variant={isOutOfStock ? "secondary" : "default"}
         >
           {category}
