@@ -254,9 +254,9 @@ Tests cover:
 
 ### 6. Create new account
 ![account](./create_account.png)
+*Creating a new account.*
 
 
-> **Note:** To capture your own screenshots, run the application and use your browser's screenshot tool or a screen capture utility.
 
 ---
 
