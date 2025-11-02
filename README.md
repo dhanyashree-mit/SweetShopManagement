@@ -257,6 +257,11 @@ Tests cover:
 *Creating a new account.*
 
 
+### 6. Dark mode
+![darkmode](./darkmode.png)
+*Dark mode .*
+
+
 
 ---
 
