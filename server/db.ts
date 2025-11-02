@@ -3,8 +3,10 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { users, sweets } from "@shared/schema";
 import * as schema from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { stats } from "@shared/schema";
 
 const sqlite = new Database("sqlite.db");
+
 export const db = drizzle(sqlite, { schema });
 
 // Create tables if they don't exist
@@ -24,6 +26,12 @@ sqlite.exec(`
     quantity INTEGER NOT NULL DEFAULT 0
   );
 `);
+(async () => {
+  const existing = await db.select().from(stats);
+  if (existing.length === 0) {
+    await db.insert(stats).values({ total_revenue: 0 });
+  }
+})();
 
 // Seed initial data if database is empty
 async function seedDatabase() {

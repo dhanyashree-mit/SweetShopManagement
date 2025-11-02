@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { AuthProvider, useAuth } from "./lib/auth";
@@ -9,16 +9,23 @@ import RegisterPage from "@/pages/RegisterPage";
 import ShopPage from "@/pages/ShopPage";
 import AdminPage from "@/pages/AdminPage";
 
-type Page = 'login' | 'register' | 'shop' | 'admin';
+type Page = "login" | "register" | "shop" | "admin";
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<Page>('login');
+  const [currentPage, setCurrentPage] = useState<Page>("login");
   const { user, logout, isLoading } = useAuth();
 
   const handleLogout = () => {
     logout();
-    setCurrentPage('login');
+    setCurrentPage("login");
   };
+
+  // ✅ Automatically go to correct page after login
+  useEffect(() => {
+    if (user) {
+      setCurrentPage(user.isAdmin ? "admin" : "shop");
+    }
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -33,15 +40,11 @@ function AppContent() {
   if (!user) {
     return (
       <>
-        {currentPage === 'login' && (
-          <LoginPage 
-            onNavigateRegister={() => setCurrentPage('register')}
-          />
+        {currentPage === "login" && (
+          <LoginPage onNavigateRegister={() => setCurrentPage("register")} />
         )}
-        {currentPage === 'register' && (
-          <RegisterPage 
-            onNavigateLogin={() => setCurrentPage('login')}
-          />
+        {currentPage === "register" && (
+          <RegisterPage onNavigateLogin={() => setCurrentPage("login")} />
         )}
       </>
     );
@@ -49,18 +52,18 @@ function AppContent() {
 
   return (
     <>
-      {currentPage === 'shop' && (
-        <ShopPage 
+      {currentPage === "shop" && (
+        <ShopPage
           user={user}
           onLogout={handleLogout}
-          onNavigateAdmin={() => setCurrentPage('admin')}
+          onNavigateAdmin={() => setCurrentPage("admin")}
         />
       )}
-      {currentPage === 'admin' && (
-        <AdminPage 
+      {currentPage === "admin" && (
+        <AdminPage
           user={user}
           onLogout={handleLogout}
-          onNavigateShop={() => setCurrentPage('shop')}
+          onNavigateShop={() => setCurrentPage("shop")}
         />
       )}
     </>

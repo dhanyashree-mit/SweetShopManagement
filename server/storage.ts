@@ -1,24 +1,25 @@
 import { type User, type InsertUser, type Sweet, type InsertSweet } from "@shared/schema";
 import { db, users, sweets } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { stats } from "@shared/schema"; // add stats table import
 
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Sweet operations
   getSweet(id: number): Promise<Sweet | undefined>;
   getAllSweets(): Promise<Sweet[]>;
   createSweet(sweet: InsertSweet): Promise<Sweet>;
   updateSweet(id: number, sweet: Partial<InsertSweet>): Promise<Sweet | undefined>;
   deleteSweet(id: number): Promise<boolean>;
-  
+
   // Inventory operations
   purchaseSweet(id: number, quantity: number): Promise<Sweet | undefined>;
   restockSweet(id: number, quantity: number): Promise<Sweet | undefined>;
-  
+
   // Search operations
   searchSweets(params: {
     name?: string;
@@ -70,23 +71,33 @@ export class SQLiteStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Inventory operations
   async purchaseSweet(id: number, quantity: number): Promise<Sweet | undefined> {
-    const sweet = await this.getSweet(id);
-    if (!sweet || sweet.quantity < quantity) {
-      return undefined;
-    }
-    
-    const newQuantity = sweet.quantity - quantity;
-    return this.updateSweet(id, { quantity: newQuantity });
+  const sweet = await this.getSweet(id);
+  if (!sweet || sweet.quantity < quantity) return undefined;
+
+  const newQuantity = sweet.quantity - quantity;
+  const updatedSweet = await this.updateSweet(id, { quantity: newQuantity });
+
+  // Calculate total sale amount
+  const saleAmount = sweet.price * quantity;
+
+  // ✅ Ensure stats row exists before updating revenue
+  const existingStats = await db.select().from(stats);
+  if (existingStats.length === 0) {
+    await db.insert(stats).values({ total_revenue: 0 });
   }
+
+  // ✅ Update total revenue
+  await db.run(sql`UPDATE stats SET total_revenue = total_revenue + ${saleAmount}`);
+
+  return updatedSweet;
+}
+
 
   async restockSweet(id: number, quantity: number): Promise<Sweet | undefined> {
     const sweet = await this.getSweet(id);
-    if (!sweet) {
-      return undefined;
-    }
-    
+    if (!sweet) return undefined;
+
     const newQuantity = sweet.quantity + quantity;
     return this.updateSweet(id, { quantity: newQuantity });
   }
@@ -98,25 +109,19 @@ export class SQLiteStorage implements IStorage {
     minPrice?: number;
     maxPrice?: number;
   }): Promise<Sweet[]> {
-    let query = db.select().from(sweets);
-    const allSweets = await query;
-    
+    const allSweets = await db.select().from(sweets);
+
     return allSweets.filter(sweet => {
-      if (params.name && !sweet.name.toLowerCase().includes(params.name.toLowerCase())) {
-        return false;
-      }
-      if (params.category && sweet.category !== params.category) {
-        return false;
-      }
-      if (params.minPrice !== undefined && sweet.price < params.minPrice) {
-        return false;
-      }
-      if (params.maxPrice !== undefined && sweet.price > params.maxPrice) {
-        return false;
-      }
+      if (params.name && !sweet.name.toLowerCase().includes(params.name.toLowerCase())) return false;
+      if (params.category && sweet.category !== params.category) return false;
+      if (params.minPrice !== undefined && sweet.price < params.minPrice) return false;
+      if (params.maxPrice !== undefined && sweet.price > params.maxPrice) return false;
       return true;
     });
   }
 }
 
 export const storage = new SQLiteStorage();
+
+
+

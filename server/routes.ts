@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { stats } from "@shared/schema";
 import { 
   hashPassword, 
   comparePassword, 
@@ -11,6 +12,8 @@ import {
 } from "./auth";
 import { insertUserSchema, insertSweetSchema } from "@shared/schema";
 import { z } from "zod";
+import { db } from "./db";
+
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth endpoints
@@ -54,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
-
+ 
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -116,6 +119,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Server error" });
     }
   });
+  app.get("/api/stats", async (_req, res) => {
+  const result = await db.select().from(stats);
+  const totalRevenue = result[0]?.totalRevenue || 0;
+  res.json({ totalRevenue });
+});
 
   // Sweet endpoints (all protected)
   app.get("/api/sweets", authenticateToken, async (req, res) => {

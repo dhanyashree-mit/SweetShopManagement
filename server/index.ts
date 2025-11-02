@@ -1,19 +1,24 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { db } from "./db"; // ✅ fixed path (it’s inside 'server/db.ts')
+import { sql } from "drizzle-orm"; // ✅ needed for executing raw SQL if required
 
 const app = express();
 
-declare module 'http' {
+declare module "http" {
   interface IncomingMessage {
-    rawBody: unknown
+    rawBody: unknown;
   }
 }
-app.use(express.json({
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
@@ -46,6 +51,37 @@ app.use((req, res, next) => {
   next();
 });
 
+
+// ✅ ADD PURCHASE ROUTE (updates total revenue in stats table)
+app.post("/api/purchase", async (req: Request, res: Response) => {
+  try {
+    const { price } = req.body;
+
+    if (!price || isNaN(price)) {
+      return res.status(400).json({ success: false, message: "Invalid price" });
+    }
+
+    // Check if a stats row exists
+    const existing = await db.execute(sql`SELECT * FROM stats LIMIT 1`);
+
+    if ((existing as any).rows.length === 0) {
+      // If no stats row, insert a new one
+      await db.execute(sql`INSERT INTO stats (total_revenue) VALUES (${price})`);
+    } else {
+      // Otherwise, update the existing total
+      await db.execute(
+        sql`UPDATE stats SET total_revenue = total_revenue + ${price}`
+      );
+    }
+
+    res.json({ success: true, message: "Revenue updated successfully!" });
+  } catch (error) {
+    console.error("Purchase error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -57,25 +93,15 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  // ✅ Start the server
+  const port = parseInt(process.env.PORT || "5000", 10);
+  server.listen(port, "127.0.0.1", () => {
+    log(`✅ Server running at http://127.0.0.1:${port}`);
   });
 })();

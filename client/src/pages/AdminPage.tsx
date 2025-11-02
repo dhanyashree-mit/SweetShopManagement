@@ -142,10 +142,12 @@ export default function AdminPage({ user, onLogout, onNavigateShop }: AdminPageP
   const totalProducts = sweets.length;
   const lowStockCount = sweets.filter(s => s.quantity > 0 && s.quantity <= 10).length;
   const outOfStockCount = sweets.filter(s => s.quantity === 0).length;
-  const totalRevenue = useMemo(() => 
-    sweets.reduce((sum, s) => sum + (s.price * Math.min(s.quantity, 10)), 0),
-    [sweets]
-  );
+  const { data: statsData } = useQuery<{ totalRevenue: number }>({
+  queryKey: ['/api/stats'],
+});
+
+const totalRevenue = statsData?.totalRevenue || 0;
+
 
   const handleAddSweet = () => {
     setEditingSweet(null);

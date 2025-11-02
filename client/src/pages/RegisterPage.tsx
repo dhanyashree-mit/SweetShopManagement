@@ -39,6 +39,7 @@ export default function RegisterPage({ onNavigateLogin }: RegisterPageProps) {
         title: "Registration successful",
         description: "Your account has been created!",
       });
+      onNavigateLogin();
     } catch (error: any) {
       toast({
         title: "Registration failed",
