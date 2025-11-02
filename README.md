@@ -233,23 +233,23 @@ Tests cover:
 ## 📸 Application Screenshots
 
 ### 1. Shop Page (Customer View)
-![Shop Page](./screenshots/shop-page.png)
+![Shop Page](./main.png)
 *Browse available sweets with search and category filters. Add items to cart and make purchases.*
 
 ### 2. Admin Dashboard
-![Admin Dashboard](./screenshots/admin-dashboard.png)
+![Admin Dashboard](./screenshots/admin_dashboard.png)
 *Manage inventory, add new products, update stock levels, and monitor revenue statistics.*
 
 ### 3. Login Page
-![Login Page](./screenshots/login-page.png)
+![Login Page](./screenshots/login_page.png)
 *Secure authentication with username and password. Register new accounts or login as admin/customer.*
 
 ### 4. Purchase Modal
-![Purchase Modal](./screenshots/purchase-modal.png)
+![Purchase Modal](./purchase.png)
 *Select quantity and complete purchases with real-time inventory validation.*
 
 ### 5. Add/Edit Sweet Form
-![Sweet Form](./screenshots/sweet-form.png)
+![Sweet Form](./add.png)
 *Admin interface for adding new sweets or editing existing products.*
 
 > **Note:** To capture your own screenshots, run the application and use your browser's screenshot tool or a screen capture utility.
