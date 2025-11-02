@@ -25,3 +25,15 @@ Built with:
 ```bash
 git clone https://github.com/dhanyashree-mit/SweetShopManagement.git
 cd SweetShopManagement
+
+
+###Backend
+```bash
+cd server
+npm install
+
+
+###Frontend
+```bash
+cd ../client
+npm install
