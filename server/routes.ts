@@ -228,6 +228,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sweet) {
         return res.status(400).json({ message: "Insufficient stock or sweet not found" });
       }
+      // Ensure stats table has at least one row
+const existingStats = await db.select().from(stats);
+const saleAmount = sweet.price * quantity;
+
+if (existingStats.length === 0) {
+  await db.insert(stats).values({ totalRevenue: saleAmount });
+} else {
+  await db.update(stats)
+    .set({ totalRevenue: existingStats[0].totalRevenue + saleAmount });
+}
+
 
       res.json(sweet);
     } catch (error) {
