@@ -556,11 +556,6 @@ While AI was instrumental, human oversight was critical for:
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License.
-
----
 
 ## 👨‍💻 Author
 
